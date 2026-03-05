@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Model files (large binaries)
+model/best.pt
+model/best.onnx
+*.onnx
+*.pt
+
+# Output & logs
+output/
+logs/
+
+# Claude Code
+.claude/
+
+# Data (test videos)
+data/*.mp4
+data/*.avi
+
+# Training runs
+training/runs/
+runs/
+
+# Compiled LaTeX
+docs/*.aux
+docs/*.log
+docs/*.out
+docs/*.synctex.gz
+docs/*.toc
+docs/*.fls
+docs/*.fdb_latexmk
+docs/*.bbl
+docs/*.blg
+docs/*.pdf

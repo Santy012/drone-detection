@@ -1,0 +1,9 @@
+path: F:/Datasets/Drones/Anti-UAV-RGBT/dataset_yolo
+
+train: images/train
+val: images/val
+test: images/test
+
+nc: 1
+names: ['drone']
+

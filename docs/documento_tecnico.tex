@@ -1,0 +1,157 @@
+\documentclass[sigconf,nonacm]{acmart}
+\usepackage{proyectoACM}
+
+
+\title{SISTEMA LOCAL DE DETECCIÓN DE DRONES MEDIANTE VISIÓN POR COMPUTADORA}
+
+
+\author{Camilo Millán, Santiago Castellanos}
+\affiliation{%
+\institution{Universidad Sergio Arboleda}
+\city{Bogotá}
+\country{Colombia}
+}
+
+
+\renewcommand{\shortauthors}{Autor et al.}
+
+
+\areaaccion{Seguridad y vigilancia aérea}
+\autoridadconsultada{Andrés Ducuara}
+
+
+\begin{document}
+
+
+\maketitle
+
+
+\section{Información General}
+
+
+\begin{itemize}
+\item \textbf{Institución:} Universidad Sergio Arboleda
+\item \textbf{Programa:} Ciencias De La Computación E Inteligencia Artificial
+\item \textbf{Fecha:} \today
+\end{itemize}
+
+
+\section{Área de Acción}
+
+
+\cajainfo{\getareaaccion}
+
+
+\section{Docente o Autoridad Consultada}
+
+
+\cajainfo{\getautoridadconsultada}
+
+
+\section{Planteamiento del Problema}
+
+
+Colombia enfrenta un incremento sostenido en el uso de drones con fines ilícitos por parte de grupos armados organizados y estructuras criminales. Desde 2020 se han documentado ataques con drones cargados de explosivos contra bases militares y poblaciones civiles en departamentos como Cauca, Norte de Santander y Arauca. A esto se suma el uso de aeronaves no tripuladas para contrabando en centros penitenciarios, vigilancia de rutas de narcotráfico y reconocimiento de operaciones de la fuerza pública.
+
+Los sistemas de detección anti-drones disponibles comercialmente (DroneShield, Dedrone, Rafael Drone Dome) superan los \$100,000 USD, lo que los hace inviables para municipios, bases rurales e instalaciones con presupuesto limitado ---precisamente las zonas más afectadas por estas amenazas.
+
+Se identifica entonces la necesidad de un sistema de detección de drones que sea económicamente accesible, técnicamente viable con hardware convencional y capaz de operar de forma autónoma sin depender de infraestructura en la nube.
+
+
+\section{Justificación}
+
+
+El uso de drones con fines ilícitos en Colombia ---ataques con explosivos, contrabando en cárceles y vigilancia de rutas de narcotráfico--- representa una amenaza creciente. Sin embargo, los sistemas de detección disponibles superan los \$100,000 USD, haciéndolos inaccesibles para las zonas más vulnerables del país.
+
+Este proyecto plantea una alternativa de costo cero en infraestructura que, mediante un motor de inferencia propio desarrollado en C++ con ONNX Runtime y OpenCV, permite detectar drones en tiempo real utilizando la webcam de un computador portátil, con alertas automáticas vía Telegram. El modelo de detección, entrenado previamente con la arquitectura YOLOv8n, se exporta a formato ONNX y se consume a través de un pipeline de visión por computadora implementado desde cero, sin dependencia de frameworks de alto nivel como Ultralytics o PyTorch en tiempo de ejecución. Al eliminar la dependencia de servicios en la nube, el sistema opera sin costos recurrentes y con latencia mínima.
+
+
+\section{Objetivos}
+
+
+\subsection{Objetivo General}
+
+
+Diseñar e implementar un sistema local de detección de drones de bajo costo, basado en un motor de inferencia propio desarrollado en C++ que consume un modelo ONNX previamente entrenado con la arquitectura YOLOv8n, capaz de identificar aeronaves no tripuladas en tiempo real mediante webcam y emitir notificaciones automáticas a través de Telegram.
+
+
+\subsection{Objetivos Específicos}
+
+
+\begin{enumerate}
+\item Exportar el modelo YOLOv8n entrenado (\texttt{best.pt}, mAP50 de 99.25\%) a formato ONNX para su consumo mediante ONNX Runtime en C++, desacoplando la inferencia de cualquier framework de entrenamiento.
+\item Implementar desde cero en C++ el pipeline de preprocesamiento de imagen: redimensionamiento con \textit{letterboxing} a 640$\times$640, normalización de píxeles al rango [0,1], conversión de formato HWC a CHW y preparación del tensor de entrada compatible con ONNX Runtime.
+\item Implementar desde cero en C++ el pipeline de postprocesamiento: decodificación de las salidas del modelo (coordenadas de bounding boxes y scores de confianza), filtrado por umbral de confianza y supresión de no-máximos (NMS) para eliminar detecciones redundantes.
+\item Desarrollar el módulo de captura de video en tiempo real desde la webcam del computador mediante OpenCV en C++, con detección de movimiento por diferencia de frames como prefiltro para optimizar el uso de recursos.
+\item Desplegar una infraestructura de backend compuesta por un endpoint REST que reciba los eventos de detección desde el módulo C++, persista los eventos en base de datos y dispare notificaciones en tiempo real a través de un bot de Telegram con imagen anotada y métricas de detección.
+\item Validar el sistema mediante pruebas end-to-end midiendo latencia de inferencia en C++, precisión del pipeline custom frente al original de Ultralytics, y estabilidad en operación continua.
+\end{enumerate}
+
+
+\section{Metodología}
+
+
+El desarrollo del proyecto sigue una metodología incremental organizada en cuatro fases:
+
+\subsection{Fase 0: Exportación del modelo y configuración del entorno (Semana 1)}
+
+Exportación del modelo YOLOv8n entrenado (\texttt{best.pt}, mAP50 de 99.25\%) a formato ONNX mediante el script de exportación de Ultralytics (ejecución única). Se configura el entorno de compilación C++ con CMake, se instalan las dependencias (OpenCV 4.x, ONNX Runtime 1.17+) y se verifica la carga exitosa del modelo \texttt{.onnx} desde C++. Se realizan pruebas de velocidad de inferencia cruda (sin pre/postprocesamiento) para establecer la línea base de rendimiento del equipo.
+
+\subsection{Fase 1: Motor de inferencia en C++ (Semanas 1--2)}
+
+Desarrollo del motor de detección en C++ implementando desde cero:
+\begin{itemize}
+\item \textbf{Preprocesamiento:} Redimensionamiento con \textit{letterboxing} (preservando aspect ratio con padding gris 114), conversión BGR$\rightarrow$RGB, normalización [0,1], reordenamiento HWC$\rightarrow$CHW y construcción del tensor NCHW float32.
+\item \textbf{Inferencia:} Carga de la sesión ONNX Runtime, configuración del proveedor de ejecución (CUDA si disponible, CPU como fallback) y ejecución del modelo sobre el tensor de entrada.
+\item \textbf{Postprocesamiento:} Decodificación de la salida del modelo (tensor de forma $1 \times 5 \times 8400$ para una clase), transposición a formato por-detección, filtrado por umbral de confianza, conversión de coordenadas $(cx,cy,w,h)$ a $(x_1,y_1,x_2,y_2)$, re-escalado a las coordenadas originales de la imagen, y aplicación del algoritmo de supresión de no-máximos (NMS) con umbral IoU configurable.
+\item \textbf{Captura y visualización:} Captura de video desde la webcam mediante \texttt{cv2::VideoCapture}, detección de movimiento por diferencia de frames (\texttt{cv2::absdiff}) como prefiltro, renderizado de bounding boxes anotados y lógica de cooldown para evitar alertas duplicadas.
+\end{itemize}
+
+\subsection{Fase 2: Backend de notificaciones (Semanas 2--3)}
+
+Despliegue de la infraestructura de backend para persistencia y notificaciones. Se implementa un endpoint REST (usando un framework como NestJS o FastAPI) que recibe los eventos de detección desde el módulo C++ vía HTTP POST. El backend persiste cada evento en base de datos (PostgreSQL o SQLite) con la imagen anotada codificada en Base64, el timestamp, el nivel de confianza y metadatos adicionales. Adicionalmente, se integra un bot de Telegram que envía alertas en tiempo real con la imagen de la detección y las métricas asociadas, aplicando políticas de cooldown para evitar saturación.
+
+\subsection{Fase 3: Integración y validación (Semanas 3--4)}
+
+Integración completa del flujo: Webcam $\rightarrow$ Detección de movimiento $\rightarrow$ Preprocesamiento $\rightarrow$ Inferencia ONNX $\rightarrow$ Postprocesamiento (NMS) $\rightarrow$ HTTP POST al endpoint REST $\rightarrow$ Base de datos $\rightarrow$ Telegram. Se realizan pruebas end-to-end del pipeline completo, validación cruzada de las detecciones del motor C++ frente al pipeline original de Ultralytics en Python, medición de latencia en cada etapa, optimización de parámetros (umbrales de confianza, umbral IoU para NMS, intervalo de cooldown, resolución de captura) y prueba de estabilidad en operación continua.
+
+
+\section{Plan de Trabajo}
+
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|c|l|l|}
+\hline
+\textbf{Semana} & \textbf{Fase} & \textbf{Actividades principales} \\
+\hline
+1 & Modelo + Entorno & Exportar ONNX, instalar OpenCV + ONNX Runtime, CMake \\
+\hline
+1--2 & Motor C++ & Pre/postprocesamiento, inferencia, NMS, webcam \\
+\hline
+2--3 & Backend & Endpoint REST, base de datos, bot Telegram \\
+\hline
+3--4 & Integración & Pruebas E2E, validación vs. Ultralytics, estabilidad \\
+\hline
+4 & Ajustes & Optimizar umbrales, documentación final \\
+\hline
+\end{tabular}
+\caption{Cronograma de implementación}
+\end{table}
+
+
+\section{Resultados Esperados}
+
+
+\begin{itemize}
+\item \textbf{Sistema funcional:} Prototipo operativo de detección de drones en C++ que cubra el ciclo completo desde captura de video por webcam hasta notificación al usuario vía Telegram, operando de forma autónoma.
+\item \textbf{Motor de inferencia propio:} Pipeline completo de preprocesamiento, inferencia ONNX y postprocesamiento (NMS) implementado desde cero en C++, sin dependencia de Ultralytics o PyTorch en tiempo de ejecución.
+\item \textbf{Equivalencia de precisión:} Validación de que el motor C++ produce detecciones equivalentes (mAP50 $\geq$ 95\%) a las del pipeline original de Ultralytics en Python.
+\item \textbf{Latencia end-to-end:} Tiempo total desde la captura del frame hasta la recepción de la alerta en Telegram inferior a 2 segundos.
+\item \textbf{Costo operativo cero:} Operación del sistema sin costos recurrentes de infraestructura en la nube, utilizando únicamente el hardware existente (computador con webcam).
+\item \textbf{Backend de notificaciones:} API REST funcional que persiste eventos de detección en base de datos y dispara notificaciones automáticas vía Telegram con imagen anotada.
+\item \textbf{Documentación técnica:} Documento de arquitectura, guía de compilación (CMake) y configuración reproducible del sistema.
+\end{itemize}
+
+
+\end{document}
