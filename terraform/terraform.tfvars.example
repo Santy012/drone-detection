@@ -1,0 +1,4 @@
+aws_region         = "us-east-1"
+lab_role_arn       = "arn:aws:iam::123456789012:role/LabRole"
+telegram_bot_token = "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+telegram_chat_id   = "-1001234567890"

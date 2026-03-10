@@ -11,7 +11,7 @@ import os
 # CONFIGURACIÓN
 # --------------------
 
-MODEL_PATH = Path("best.pt")
+MODEL_PATH = Path(__file__).resolve().parent.parent / "model" / "best.pt"
 
 # VIDEO POR ARGUMENTO
 if len(sys.argv) < 2:

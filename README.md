@@ -1,186 +1,110 @@
-# Anti-UAV RGB Detection with YOLOv8
-
-Proyecto local para **detección de drones (UAV)** a partir de **videos RGB (`visible.mp4`) y anotaciones (`visible.json`)**, utilizando **YOLOv8** y **PyTorch con CUDA**.
-
-El pipeline completo cubre:
-- Construcción del dataset YOLO desde video + JSON
-- Verificación visual de etiquetas
-- Entrenamiento con checkpoints
-- Inferencia sobre video
-
----
-
-## 📁 Estructura del proyecto
-
-Anti-UAV-RGBT/
-│
-├── train/ # Videos y JSON (entrenamiento)
-├── val/ # Videos y JSON (validación)
-├── test/ # Videos y JSON (prueba)
-│
-├── dataset_yolo/ # Dataset generado automáticamente
-│ ├── images/
-│ │ ├── train/
-│ │ ├── val/
-│ │ └── test/
-│ └── labels/
-│ ├── train/
-│ ├── val/
-│ └── test/
-│
-├── runs/ # Resultados YOLO (entrenamiento e inferencia)
-│
-├── build_yolo_dataset.py # Genera imágenes y labels desde video + JSON
-├── check_yolo_labels.py # Verificación visual de bounding boxes
-├── train_yolo.py # Entrenamiento YOLOv8
-├── predict_video.py # Inferencia sobre video
-│
-├── drone.yaml # Configuración del dataset YOLO
-├── requirements.txt # Dependencias mínimas del proyecto
-└── README.md
-
-
----
-
-## 🧠 Descripción del dataset de origen
-
-Cada subcarpeta dentro de `train/`, `val/` y `test/` contiene:
-
-visible.mp4
-visible.json
-infrared.mp4 # (no usado por ahora)
-infrared.json # (no usado por ahora)
-
-
-El archivo `visible.json` contiene:
-- `exist`: indica si el dron está presente en cada frame
-- `gt_rect`: bounding box `[x, y, w, h]` por frame
-
-Suposiciones actuales:
-- **Una sola clase** (`drone`)
-- **Un solo objeto por frame**
-
----
-
-## ⚙️ Requisitos del sistema
-
-- Windows
-- Python **3.10.x**
-- GPU NVIDIA con CUDA funcional
-- Drivers NVIDIA correctamente instalados
-
----
-
-## Instalación del entorno
-
-### 1. Crear y activar entorno virtual
-
-```bat
-python -m venv venv
-venv\Scripts\activate
-
-### 2. Instalar PyTorch con CUDA
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
-
-### 3. Instalar dependencias del proyecto
-pip install -r requirements.txt
-
-###4. Verificar disponibilidad de GPU
-python -c "import torch; print(torch.cuda.is_available())"
-
-Debe imprimir True.
-
-## Construcción del dataset YOLO
-
-Genera imágenes y etiquetas a partir de los videos y archivos JSON:
-
-python build_yolo_dataset.py
-
-Salida generada:
-
-dataset_yolo/
-  images/{train,val,test}
-  labels/{train,val,test}
-
-## Verificación visual de etiquetas (PASO OBLIGATORIO)
-
-### Antes de entrenar, validar visualmente las bounding boxes:
-
-python check_yolo_labels.py
-
-Se mostrarán imágenes con las cajas dibujadas sobre el dron.
-
-## Entrenamiento del modelo
-
-Ejecutar el entrenamiento con checkpoints automáticos:
-
-python train_yolo.py
-
-Resultados generados:
-
-runs/detect/train/
-├── weights/
-│   ├── best.pt
-│   ├── last.pt
-│   ├── epoch5.pt
-│   ├── epoch10.pt
-│   └── ...
-├── results.csv
-├── results.png
-
-Métricas de entrenamiento
-
-Archivo principal:
-
-runs/detect/train/results.csv
-
-Incluye por época:
-
-box_loss
-
-cls_loss
-
-dfl_loss
-
-precision
-
-recall
-
-mAP50
-
-mAP50-95
-
-Inferencia sobre video
-
-Editar la ruta del video dentro de predict_video.py y ejecutar:
-
-python predict_video.py
-
-Resultados guardados automáticamente en:
-
-runs/detect/predict/
-
-Incluye el video con bounding boxes dibujadas.
-
-Estado actual del proyecto
-
-Dataset generado correctamente
-Etiquetas verificadas visualmente
-Modelo entrenado con alto desempeño
-Inferencia en tiempo real funcional
-
-Posibles extensiones futuras
-
-Entrenamiento con infrared (IR)
-
-Fusión RGB + IR
-
-Inferencia batch sobre múltiples videos
-
-Exportación a ONNX / TensorRT
-
-Integración con trackers (BYTETrack, DeepSORT)
-
-Nota final
-
-Este proyecto está diseñado para uso local, reproducible y controlado, priorizando claridad del pipeline, estabilidad en GPU y facilidad de modificación del código.
+# Drone Detection System
+
+Sistema de deteccion de drones en tiempo real mediante vision por computadora (YOLOv8n) con backend serverless en AWS.
+
+## Arquitectura
+
+```
+Laptop (webcam + inferencia ONNX)
+  |
+  |-- POST /presign  --> API Gateway --> presign-handler Lambda --> presigned URL S3
+  |-- PUT imagen     --> S3 (annotated/{device}/{fecha}/{ts}.jpg)
+  |-- POST /detections --> API Gateway --> detection-handler Lambda --> DynamoDB
+                                              |-- invoca notify-handler Lambda --> Telegram
+```
+
+- **Inferencia local:** webcam + cv2.dnn + modelo ONNX (~10 FPS en CPU)
+- **Backend cloud:** AWS Lambda + API Gateway + S3 + DynamoDB
+- **Notificaciones:** Bot de Telegram con cooldown de 30s
+
+## Estructura del proyecto
+
+```
+Drone Detection/
+├── inference/          # Scripts de inferencia
+│   ├── detect_webcam.py        # Deteccion en tiempo real (webcam + cloud)
+│   ├── predict_video.py        # Inferencia con Ultralytics (referencia)
+│   └── predict_video_onnx.py   # Inferencia con cv2.dnn (pipeline propio)
+├── model/              # Modelo entrenado
+│   ├── best.pt                 # Modelo PyTorch original (6.2MB)
+│   ├── best.onnx               # Modelo exportado a ONNX
+│   └── export_onnx.py          # Script de exportacion
+├── terraform/          # Infraestructura AWS (Terraform)
+│   ├── main.tf, variables.tf, s3.tf, dynamodb.tf
+│   ├── lambda.tf, api_gateway.tf, outputs.tf
+│   └── README.md               # Guia de deploy
+├── lambdas/            # Codigo fuente de Lambdas
+│   ├── presign_handler/        # Genera presigned URL de S3
+│   ├── detection_handler/      # Gestion eventos DynamoDB
+│   └── notify_handler/         # Cooldown + envio Telegram
+├── training/           # Scripts de entrenamiento (completado)
+├── docs/               # Documentacion tecnica
+├── data/               # Videos de prueba
+└── output/             # Resultados de ejecucion
+```
+
+## Modelo
+
+| Metrica | Valor |
+|---------|-------|
+| Arquitectura | YOLOv8n (3.2M parametros) |
+| Clase | drone (unica) |
+| mAP50 | 99.25% |
+| Precision | 99.1% |
+| Recall | 98.8% |
+| Input | 640x640 RGB |
+| Runtime | cv2.dnn (CPU) |
+
+## Requisitos
+
+- Python 3.10+
+- OpenCV (`pip install opencv-python`)
+- Terraform >= 1.5 (para infraestructura AWS)
+- AWS CLI configurado
+- Bot de Telegram (para notificaciones)
+
+## Uso rapido
+
+### Deteccion local (solo webcam)
+
+```bash
+python inference/detect_webcam.py
+```
+
+Controles: `q` salir, `m` toggle filtro de movimiento.
+
+### Deteccion con reporte a AWS
+
+```bash
+python inference/detect_webcam.py \
+  --api-url https://xxxxx.execute-api.us-east-1.amazonaws.com/v1 \
+  --device-id laptop-01
+```
+
+### Deploy de infraestructura AWS
+
+Ver [terraform/README.md](terraform/README.md) para instrucciones completas.
+
+```bash
+cd terraform
+cp terraform.tfvars.example terraform.tfvars
+# Editar terraform.tfvars con lab_role_arn, telegram_bot_token, telegram_chat_id
+terraform init
+terraform apply
+```
+
+## Estado del proyecto
+
+- [x] A1 — Deteccion en tiempo real desde webcam (~10 FPS CPU)
+- [x] A2 — Prefiltro de movimiento (ahorra ~85% CPU)
+- [ ] A3 — Validacion ONNX vs Ultralytics
+- [x] A4 — Infraestructura AWS con Terraform (desplegada)
+- [x] A5 — Bot Telegram + notify-handler con cooldown
+- [ ] A6 — Integracion E2E: webcam → AWS → Telegram
+- [ ] A7 — Pruebas de estabilidad
+
+## Hardware
+
+- **Desarrollo:** Laptop Windows 11, sin GPU dedicada
+- **Edge (futuro):** Raspberry Pi 3B+ (solo captura, sin IA)
+- **Cloud:** AWS Lambda (Python 3.11, 128MB)
