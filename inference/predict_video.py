@@ -6,6 +6,7 @@ import csv
 import yaml
 import hashlib
 import os
+import cv2
 
 # --------------------
 # CONFIGURACIÓN
@@ -79,6 +80,9 @@ else:
 # --------------------
 # INFERENCIA CON TRACKING
 # --------------------
+
+cv2.namedWindow(str(VIDEO_PATH), cv2.WINDOW_NORMAL)
+cv2.resizeWindow(str(VIDEO_PATH), 1280, 720)
 
 results = model.track(
     source=str(VIDEO_PATH),
