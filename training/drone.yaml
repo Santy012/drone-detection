@@ -1,9 +1,7 @@
-path: F:/Datasets/Drones/Anti-UAV-RGBT/dataset_yolo
-
-train: images/train
-val: images/val
-test: images/test
+path: ../data  # Ruta relativa desde donde se corre el script de entrenamiento
+train: images
+val: images   # Por ahora usamos la misma carpeta si no hay split, o puedes crear data/images/train
+test: images
 
 nc: 1
 names: ['drone']
-
