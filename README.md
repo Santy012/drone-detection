@@ -1,110 +1,80 @@
-# Drone Detection System
+# Detección de drones con YOLOv8 y backend serverless en AWS
 
-Sistema de deteccion de drones en tiempo real mediante vision por computadora (YOLOv8n) con backend serverless en AWS.
+Sistema de detección de drones en video mediante visión por computadora. Un modelo YOLOv8n, entrenado sobre el canal visible del dataset Anti-UAV-RGBT, corre en un computador portátil sin GPU (ONNX con `cv2.dnn`) y reporta las detecciones a un backend serverless en AWS, que guarda la evidencia y notifica por Telegram.
+
+> Proyecto desarrollado en pareja por Camilo Millán y Santiago Castellanos para la asignatura de Procesamiento de Imágenes (2026). Este repositorio es una copia del repositorio privado del proyecto, publicada con autorización; de la historia se retiraron los archivos de trabajo interno. La sección [Participación](#participación) detalla qué parte desarrolló cada uno.
+
+![Métricas de entrenamiento](docs/img/metricas.jpeg)
+
+## Resultados del modelo
+
+| Métrica (partición de validación) | Valor |
+| --- | --- |
+| Arquitectura | YOLOv8n (3,2 M parámetros), una clase: `drone` |
+| Precisión | 99,1 % |
+| Recall | 98,8 % |
+| mAP@0.5 | 99,4 % |
+| mAP@0.5:0.95 | 71,3 % |
+| Entrada | 640 × 640 RGB |
+
+El mAP@0.5 casi perfecto indica que el modelo encuentra los drones; el mAP@0.5:0.95 más bajo muestra que el ajuste fino de la caja sigue siendo el punto débil, sobre todo con drones pequeños y lejanos.
+
+![Matriz de confusión](docs/img/confusion_matrix.jpeg)
 
 ## Arquitectura
 
 ```
-Laptop (webcam + inferencia ONNX)
-  |
-  |-- POST /presign  --> API Gateway --> presign-handler Lambda --> presigned URL S3
-  |-- PUT imagen     --> S3 (annotated/{device}/{fecha}/{ts}.jpg)
-  |-- POST /detections --> API Gateway --> detection-handler Lambda --> DynamoDB
-                                              |-- invoca notify-handler Lambda --> Telegram
+Portátil (webcam + inferencia ONNX)
+  ├─ POST /presign     → API Gateway → Lambda presign   → URL firmada de S3
+  ├─ PUT imagen        → S3 (annotated/{dispositivo}/{fecha}/{ts}.jpg)
+  └─ POST /detections  → API Gateway → Lambda detection → DynamoDB
+                                           └─ Lambda notify → Telegram (con enfriamiento de 30 s)
 ```
 
-- **Inferencia local:** webcam + cv2.dnn + modelo ONNX (~10 FPS en CPU)
-- **Backend cloud:** AWS Lambda + API Gateway + S3 + DynamoDB
-- **Notificaciones:** Bot de Telegram con cooldown de 30s
+- **Inferencia local:** captura de webcam, prefiltro de movimiento (ahorra cerca del 85 % de CPU) y modelo ONNX con `cv2.dnn`, ~10 FPS en CPU.
+- **Nube:** AWS Lambda, API Gateway, S3 y DynamoDB, desplegados con Terraform.
 
-## Estructura del proyecto
+## Participación
+
+**Santiago Castellanos** — modelo de detección:
+
+- Planeación del modelo y estudio de alternativas antes de elegir YOLOv8n.
+- Análisis y planteamiento del procesamiento de imágenes: construcción del dataset en formato YOLO a partir de los videos de Anti-UAV-RGBT (un cuadro de cada cinco, con particiones de entrenamiento, validación y prueba) y estudio del preprocesado.
+- Entrenamiento y evaluación del modelo final: YOLOv8n preentrenado, 50 épocas, entrada RGB de 640 × 640.
+- En una iteración posterior, comparación entre el preprocesado manual a escala de grises y la aumentación de datos de YOLO ajustada a objetos pequeños; ese trabajo está en la rama [`TrainingModelUpdates`](../../tree/TrainingModelUpdates).
+
+**Camilo Millán** — arquitectura del sistema e infraestructura en la nube:
+
+- Diseño de la arquitectura híbrida entre el dispositivo de captura y la nube, pensada para hardware limitado como una Raspberry Pi sin GPU.
+- Pipeline de inferencia propio con ONNX y `cv2.dnn`: preprocesamiento con *letterboxing*, inferencia, supresión de no máximos y posprocesamiento, más el prefiltro de movimiento que reduce el uso de CPU.
+- Backend serverless en AWS desplegado con Terraform: API Gateway, funciones Lambda para URLs firmadas, registro de detecciones y notificaciones, almacenamiento en S3 y DynamoDB.
+- Bot de Telegram con control de enfriamiento para evitar alertas repetidas.
+
+## Estructura
 
 ```
-Drone Detection/
-├── inference/          # Scripts de inferencia
-│   ├── detect_webcam.py        # Deteccion en tiempo real (webcam + cloud)
-│   ├── predict_video.py        # Inferencia con Ultralytics (referencia)
-│   └── predict_video_onnx.py   # Inferencia con cv2.dnn (pipeline propio)
-├── model/              # Modelo entrenado
-│   ├── best.pt                 # Modelo PyTorch original (6.2MB)
-│   ├── best.onnx               # Modelo exportado a ONNX
-│   └── export_onnx.py          # Script de exportacion
-├── terraform/          # Infraestructura AWS (Terraform)
-│   ├── main.tf, variables.tf, s3.tf, dynamodb.tf
-│   ├── lambda.tf, api_gateway.tf, outputs.tf
-│   └── README.md               # Guia de deploy
-├── lambdas/            # Codigo fuente de Lambdas
-│   ├── presign_handler/        # Genera presigned URL de S3
-│   ├── detection_handler/      # Gestion eventos DynamoDB
-│   └── notify_handler/         # Cooldown + envio Telegram
-├── training/           # Scripts de entrenamiento (completado)
-├── docs/               # Documentacion tecnica
-├── data/               # Videos de prueba
-└── output/             # Resultados de ejecucion
+inference/   detección en webcam e inferencia sobre video (Ultralytics y ONNX)
+model/       modelo entrenado (best.pt, best.onnx) y exportación a ONNX
+training/    construcción del dataset, entrenamiento y resultados
+lambdas/     funciones presign, detection y notify
+terraform/   infraestructura en AWS
+docs/        documento técnico y arquitectura
 ```
 
-## Modelo
+## Cómo ejecutarlo
 
-| Metrica | Valor |
-|---------|-------|
-| Arquitectura | YOLOv8n (3.2M parametros) |
-| Clase | drone (unica) |
-| mAP50 | 99.25% |
-| Precision | 99.1% |
-| Recall | 98.8% |
-| Input | 640x640 RGB |
-| Runtime | cv2.dnn (CPU) |
-
-## Requisitos
-
-- Python 3.10+
-- OpenCV (`pip install opencv-python`)
-- Terraform >= 1.5 (para infraestructura AWS)
-- AWS CLI configurado
-- Bot de Telegram (para notificaciones)
-
-## Uso rapido
-
-### Deteccion local (solo webcam)
+Requisitos: Python 3.10+, `pip install -r requirements.txt`. Para la parte en la nube, Terraform ≥ 1.5, AWS CLI configurado y un bot de Telegram.
 
 ```bash
+# Detección local con la webcam (q: salir, m: activar o desactivar el filtro de movimiento)
 python inference/detect_webcam.py
+
+# Detección con reporte a AWS
+python inference/detect_webcam.py --api-url https://<api-id>.execute-api.us-east-1.amazonaws.com/v1 --device-id laptop-01
 ```
 
-Controles: `q` salir, `m` toggle filtro de movimiento.
+Despliegue de la infraestructura: ver [terraform/README.md](terraform/README.md).
 
-### Deteccion con reporte a AWS
+## Alcance
 
-```bash
-python inference/detect_webcam.py \
-  --api-url https://xxxxx.execute-api.us-east-1.amazonaws.com/v1 \
-  --device-id laptop-01
-```
-
-### Deploy de infraestructura AWS
-
-Ver [terraform/README.md](terraform/README.md) para instrucciones completas.
-
-```bash
-cd terraform
-cp terraform.tfvars.example terraform.tfvars
-# Editar terraform.tfvars con lab_role_arn, telegram_bot_token, telegram_chat_id
-terraform init
-terraform apply
-```
-
-## Estado del proyecto
-
-- [x] A1 — Deteccion en tiempo real desde webcam (~10 FPS CPU)
-- [x] A2 — Prefiltro de movimiento (ahorra ~85% CPU)
-- [ ] A3 — Validacion ONNX vs Ultralytics
-- [x] A4 — Infraestructura AWS con Terraform (desplegada)
-- [x] A5 — Bot Telegram + notify-handler con cooldown
-- [ ] A6 — Integracion E2E: webcam → AWS → Telegram
-- [ ] A7 — Pruebas de estabilidad
-
-## Hardware
-
-- **Desarrollo:** Laptop Windows 11, sin GPU dedicada
-- **Edge (futuro):** Raspberry Pi 3B+ (solo captura, sin IA)
-- **Cloud:** AWS Lambda (Python 3.11, 128MB)
+Proyecto académico concluido. Quedaron implementados la detección en tiempo real, el prefiltro de movimiento, la infraestructura en AWS y las notificaciones. No se completaron la validación ONNX contra Ultralytics, la integración de extremo a extremo y las pruebas de estabilidad.

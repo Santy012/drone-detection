@@ -22,11 +22,11 @@ env/
 Thumbs.db
 desktop.ini
 
-# Model files (large binaries)
-model/best.pt
-model/best.onnx
+# Model files: solo se versiona el modelo final
 *.onnx
 *.pt
+!model/best.pt
+!model/best.onnx
 
 # Output & logs
 output/
@@ -62,3 +62,7 @@ docs/*.fdb_latexmk
 docs/*.bbl
 docs/*.blg
 docs/*.pdf
+
+# Frames del dataset (locales)
+data/images*/
+.continue/
