@@ -23,13 +23,7 @@ El mAP@0.5 casi perfecto indica que el modelo encuentra los drones; el mAP@0.5:0
 
 ## Arquitectura
 
-```
-Portátil (webcam + inferencia ONNX)
-  ├─ POST /presign     → API Gateway → Lambda presign   → URL firmada de S3
-  ├─ PUT imagen        → S3 (annotated/{dispositivo}/{fecha}/{ts}.jpg)
-  └─ POST /detections  → API Gateway → Lambda detection → DynamoDB
-                                           └─ Lambda notify → Telegram (con enfriamiento de 30 s)
-```
+![Arquitectura: detección en el dispositivo y backend serverless en AWS](docs/img/arquitectura.png)
 
 - **Inferencia local:** captura de webcam, prefiltro de movimiento (ahorra cerca del 85 % de CPU) y modelo ONNX con `cv2.dnn`, ~10 FPS en CPU.
 - **Nube:** AWS Lambda, API Gateway, S3 y DynamoDB, desplegados con Terraform.

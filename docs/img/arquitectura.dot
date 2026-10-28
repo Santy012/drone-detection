@@ -1,0 +1,15 @@
+digraph G { rankdir=LR; bgcolor="white"; pad=0.3; nodesep=0.35; ranksep=0.5;
+  node [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=12, color="#5b6b7f", fillcolor="#eef2f7", margin="0.18,0.08"];
+  edge [fontname="DejaVu Sans", fontsize=10, color="#5b6b7f", fontcolor="#3a4656"];
+  subgraph cluster_dev { label="Dispositivo (sin GPU)"; fontname="DejaVu Sans Bold"; fontsize=12; style="rounded,dashed"; color="#9aa7b6";
+    A [label="Webcam"]; B [label="Prefiltro\nde movimiento"]; C [label="YOLOv8n en ONNX\ncv2.dnn · CPU", fillcolor="#fde9cf", color="#c98a2b"]; }
+  subgraph cluster_aws { label="AWS (Terraform)"; fontname="DejaVu Sans Bold"; fontsize=12; style="rounded,dashed"; color="#9aa7b6";
+    D [label="API Gateway"]; E [label="Lambda presign"]; G [label="Lambda detection"]; I [label="Lambda notify"];
+    F [label="S3", shape=cylinder]; H [label="DynamoDB", shape=cylinder]; }
+  J [label="Telegram\nenfriamiento 30 s", fillcolor="#e3f1e6", color="#4e8a5c"];
+  A -> B -> C;
+  C -> D [label="POST /presign\nPOST /detections"];
+  D -> E; E -> C [label="URL firmada", style=dashed];
+  C -> F [label="PUT imagen"];
+  D -> G; G -> H; G -> I; I -> J;
+}
